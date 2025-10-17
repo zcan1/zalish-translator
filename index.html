@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Zalish: Tiny “Alien” Language — Translator & Particles</title>
+  <style>
+    :root{--bg:#0b0e14;--card:#131826;--muted:#98a2b3;--fg:#e5e7eb;--accent:#7dd3fc;--accent2:#a78bfa;--good:#34d399;--bad:#f87171}
+    *{box-sizing:border-box}
+    body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Inter,Ubuntu,Cantarell,'Helvetica Neue',Arial,sans-serif;background:linear-gradient(180deg,#0b0e14 0%,#0b0e14 40%,#0e1320 100%);color:var(--fg)}
+    .container{max-width:1100px;margin:0 auto;padding:32px}
+    .title{font-size:32px;font-weight:800;letter-spacing:.5px;margin:0 0 8px}
+    .subtitle{color:var(--muted);margin:0 0 24px}
+    .grid{display:grid;grid-template-columns:1fr;gap:16px}
+    @media(min-width:960px){.grid{grid-template-columns:1.2fr .8fr}}
+    .card{background:linear-gradient(180deg,#12182a 0%,#0f1525 100%);border:1px solid rgba(255,255,255,.06);border-radius:18px;padding:18px;box-shadow:0 10px 40px rgba(0,0,0,.25)}
+    .card h2{margin:6px 0 12px;font-size:18px}
+    textarea,input,button,select{font:inherit}
+    textarea{width:100%;min-height:140px;resize:vertical;color:var(--fg);background:#0b1221;border:1px solid rgba(255,255,255,.08);border-radius:14px;padding:12px;line-height:1.45}
+    .out{min-height:140px;white-space:pre-wrap;background:#0b1221;border:1px dashed rgba(255,255,255,.15);border-radius:14px;padding:12px}
+    .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+    .btn{border:1px solid rgba(255,255,255,.1);background:linear-gradient(180deg,#181f35 0%,#11182d 100%);color:var(--fg);padding:10px 14px;border-radius:12px;cursor:pointer;transition:.15s transform ease, .15s box-shadow ease}
+    .btn:hover{transform:translateY(-1px);box-shadow:0 8px 20px rgba(0,0,0,.25)}
+    .btn.secondary{background:#0b1221}
+    .muted{color:var(--muted)}
+    table{width:100%;border-collapse:collapse}
+    td,th{border-bottom:1px solid rgba(255,255,255,.06);padding:8px 6px;text-align:left}
+    code.k{background:#0b1221;border:1px solid rgba(255,255,255,.08);border-radius:8px;padding:2px 6px}
+    .pill{display:inline-block;padding:4px 10px;border-radius:999px;border:1px solid rgba(255,255,255,.1);background:#0b1221;margin:2px 6px 2px 0;color:var(--accent)}
+    .tiny{font-size:12px}
+  </style>
+  <style>
+    /* Full-screen background image that adapts to the user's screen ratio */
+    .bg{position:fixed;inset:0;z-index:-1;background: #000 center / cover no-repeat;}
+    /* A subtle dark overlay so text stays readable on top of the photo */
+    .bg::after{content:"";position:absolute;inset:0;background:radial-gradient(120% 120% at 10% 10%, rgba(0,0,0,.35), rgba(0,0,0,.65) 60%, rgba(0,0,0,.85));}
+
+    /* Strengthen UI backgrounds so they never blend into the image */
+    .card{background:rgba(12,18,32,.78);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,.18)}
+    textarea{background:rgba(8,14,28,.92);border-color:rgba(255,255,255,.22)}
+    .out{background:rgba(8,14,28,.85);border-color:rgba(255,255,255,.22)}
+    .btn{background:linear-gradient(180deg,#1b2542 0%,#121a32 100%);border-color:rgba(255,255,255,.28)}
+    .btn.secondary{background:rgba(11,18,33,.92)}
+  </style>
+</head>
+<body>
+  <!-- Adaptive background image layer (change src below to your file name in the repo) -->
+  <div class="bg" id="bg" role="presentation" aria-hidden="true"></div>
+  <div class="container">
+    <h1 class="title">Zalish — a human‑decipherable "alien" overlay</h1>
+    <p class="subtitle">Type English on the left, get Zalish on the right. Includes all small function words (“particles”) and a simple auto‑translator.</p>
+
+    <div class="grid">
+      <div class="card">
+        <h2>Translator</h2>
+        <div class="row" style="margin-bottom:8px">
+          <label><input type="checkbox" id="keepCaps" checked> <span class="tiny">Try to preserve capitalization</span></label>
+          <label><input type="checkbox" id="punctSpace" checked> <span class="tiny">Keep punctuation spacing</span></label>
+        </div>
+        <textarea id="src" placeholder="Type something like: Jacob, stop going or I will abduct you and take you onto the ship.">Jacob, stop going or I will abduct you and take you onto the ship.</textarea>
+        <div class="row" style="margin-top:10px">
+          <button class="btn" onclick="translate()">Translate → Zalish</button>
+          <button class="btn secondary" onclick="copyOut()">Copy result</button>
+        </div>
+        <div id="out" class="out" style="margin-top:12px"></div>
+        <p class="tiny muted">Heuristics: we replace function words with particles, add <code class="k">ra</code> for “will”, <code class="k">ti</code> for “did/was/were”, <code class="k">nu</code> for “not”, then morph content words (<em>consonant start</em> → move first consonant cluster to end + <code class="k">-um</code>; <em>vowel start</em> → add <code class="k">-vum</code>). Questions get <code class="k">ka</code> at the end.</p>
+      </div>
+
+      <div class="card">
+        <h2>Particles (small words)</h2>
+        <p class="muted tiny">These stay fixed; everything else morphs.</p>
+        <table>
+          <thead><tr><th>English</th><th>Zalish</th><th>Notes</th></tr></thead>
+          <tbody id="particlesBody"></tbody>
+        </table>
+        <p class="tiny muted" style="margin-top:10px">Tense: <span class="pill">past → ti</span> <span class="pill">present → na (optional)</span> <span class="pill">future → ra</span> · Negation: <span class="pill">nu</span> (put after tense) · Plural: add <span class="pill">lo</span> after a noun · Question: add <span class="pill">ka</span> at sentence end.</p>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:16px">
+      <h2>How the translator works (short)</h2>
+      <ol>
+        <li><strong>Preprocess:</strong> lowercase for matching; remember initial capitals if <em>Preserve capitalization</em> is on.</li>
+        <li><strong>Particles:</strong> swap function words via the table below (e.g., <em>the/a/an → za</em>, <em>and → ki</em>).</li>
+        <li><strong>Tense/negation:</strong> if the sentence contains <em>will</em>, add <code class="k">ra</code> near the start; if it contains <em>did/was/were</em>, add <code class="k">ti</code>. If it contains <em>not</em>, add <code class="k">nu</code> after the tense marker.</li>
+        <li><strong>Morph content words:</strong> If a word begins with a consonant cluster, move that cluster to the end and add <code class="k">-um</code>. If it begins with a vowel sound, add <code class="k">-vum</code>.</li>
+        <li><strong>Questions:</strong> if the sentence ends with <code>?</code>, append <code class="k">ka</code>.</li>
+      </ol>
+      <p class="tiny muted">This is intentionally simple so humans can decode it by ear; it won’t do full grammar parsing. You can always hand‑tune a translation after.</p>
+    </div>
+
+    <div class="card" style="margin-top:16px">
+      <h2>Try it!</h2>
+      <div class="row">
+        <button class="btn" onclick="demo('Jacob, stop going or I will abduct you and take you onto the ship.')">Use Jacob example</button>
+        <button class="btn" onclick="demo('We did not see the alien in the desert.')">Past + negation</button>
+        <button class="btn" onclick="demo('Are the lights on?')">Question</button>
+      </div>
+    </div>
+
+    <footer class="tiny muted" style="margin-top:24px">© Zalish demo. Single‑file site; drop this into <code class="k">index.html</code> and host on GitHub Pages.</footer>
+  </div>
+
+  <script>
+    // --- Particles dictionary (small words) ---
+    const PARTICLES = [
+      ['the / a / an', 'za', 'articles'],
+      ['of', 'no', 'linking/genitive'],
+      ['and', 'ki', 'coordinator'],
+      ['to', 'ta', 'direction/infinitive'],
+      ['in', 'ni', 'location'],
+      ['with', 'wa', 'instrument/comitative'],
+      ['for', 'fo', 'purpose'],
+      ['is/are/am/be', 'es', 'copula (any form)'],
+      ['not', 'nu', 'negation'],
+    ];
+
+    // Render particles table
+    const tbody = document.getElementById('particlesBody');
+    PARTICLES.forEach(([en, za, note]) => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `<td>${en}</td><td><code class="k">${za}</code></td><td class="muted">${note}</td>`;
+      tbody.appendChild(tr);
+    });
+
+    // Utility: detect if a letter is vowel
+    const VOWELS = 'aeiou';
+    function leadingConsonantCluster(word){
+      const w = word.toLowerCase();
+      // treat 'qu' as a single cluster; also allow leading apostrophes
+      const m = w.match(/^(?:'|\u2019)?(qu|[^aeiou\W]+)(?=[a-z])/i);
+      return m ? m[1] : '';
+    }
+
+    function morphWord(word){
+      // keep numbers, URLs, emojis, and pure punctuation unchanged
+      if (/^\W+$/.test(word) || /\d/.test(word) || /https?:\/\//i.test(word)) return word;
+
+      const raw = word;
+      // separate trailing punctuation like , . ! ? ; :
+      const m = raw.match(/^(.*?)([\.,!?;:]+)$/);
+      let core = m ? m[1] : raw;
+      const trail = m ? m[2] : '';
+
+      // preserve capitalization pattern (Titlecase vs lower)
+      const isCap = /^[A-Z]/.test(core);
+      const lower = core.toLowerCase();
+
+      // Short-circuit if core is a particle target; handled elsewhere
+      // but avoid double-morphing here by skipping extremely short words
+      if (lower.length <= 2) return raw; 
+
+      // If vowel start
+      if (VOWELS.includes(lower[0])) {
+        core = lower + 'vum';
+      } else {
+        const cl = leadingConsonantCluster(lower) || lower[0];
+        core = lower.replace(new RegExp('^' + cl), '') + cl + 'um';
+      }
+
+      if (isCap) core = core.charAt(0).toUpperCase() + core.slice(1);
+      return core + trail;
+    }
+
+    // Particle replacement maps (lowercase matching)
+    const PARTICLE_MAP = new Map([
+      ['the','za'],['a','za'],['an','za'],
+      ['of','no'],['and','ki'],['to','ta'],['in','ni'],['with','wa'],['for','fo'],
+      ['is','es'],['are','es'],['am','es'],['be','es'],['being','es'],['been','es'],
+      ['was','es'],['were','es'],
+      ['not','nu']
+    ]);
+
+    function tokenize(text){
+      // Split preserving punctuation tokens
+      return text.match(/\b[^\s]+\b|[\s]+|[\.,!?;:]/g) || [text];
+    }
+
+    function translate(){
+      const keepCaps = document.getElementById('keepCaps').checked;
+      const keepPunctSpace = document.getElementById('punctSpace').checked;
+      const input = document.getElementById('src').value;
+
+      // Work sentence by sentence on . ! ?
+      const sentences = input.match(/[^.!?]+[.!?]?/g) || [input];
+      const outSentences = sentences.map(s => translateSentence(s, {keepCaps, keepPunctSpace}));
+      document.getElementById('out').textContent = outSentences.join(keepPunctSpace ? ' ' : '');
+    }
+
+    function normalizeCaps(src, out){
+      // If src was Titlecase, make out Titlecase; if ALLCAPS, keep ALLCAPS
+      if (/^[A-Z][a-z]+$/.test(src)) return out.charAt(0).toUpperCase() + out.slice(1);
+      if (/^[A-Z]+$/.test(src)) return out.toUpperCase();
+      return out; // default lower/whatever we built
+    }
+
+    function translateSentence(sentence, opts){
+      const keepCaps = opts.keepCaps;
+      const keepPunctSpace = opts.keepPunctSpace;
+
+      const tokens = tokenize(sentence);
+      let hasQ = /\?$/.test(sentence.trim());
+
+      // Pass 1: detect tense/negation cues
+      const lc = sentence.toLowerCase();
+      const future = /\bwill\b/.test(lc);
+      const past = /\b(did|was|were)\b/.test(lc);
+      const neg = /\bnot\b/.test(lc);
+
+      // Pass 2: translate tokens
+      let out = [];
+      let tenseInserted = false;
+
+      for (let i=0;i<tokens.length;i++){
+        const t = tokens[i];
+        if (/^\s+$/.test(t)) { out.push(t); continue; }
+
+        const bare = t.replace(/[\.,!?;:]+$/,'');
+        const punct = t.slice(bare.length);
+        const lower = bare.toLowerCase();
+
+        // skip auxiliary cues
+        if (['will','did','was','were','do','does','didn\'t','don\'t','doesn\'t'].includes(lower)) {
+          continue;
+        }
+
+        // Insert tense/negation near the start (before first content word)
+        if (!tenseInserted && /[a-zA-Z]/.test(lower)){
+          let prefix = [];
+          if (past) prefix.push('ti');
+          else if (future) prefix.push('ra');
+          if (neg) prefix.push('nu');
+          if (prefix.length){ out.push(prefix.join(' ')); out.push(' '); }
+          tenseInserted = true;
+        }
+
+        // particle replacement (exact)
+        if (PARTICLE_MAP.has(lower)){
+          let rep = PARTICLE_MAP.get(lower);
+          if (keepCaps) rep = normalizeCaps(bare, rep);
+          out.push(rep + punct);
+          continue;
+        }
+
+        // Morph content words
+        let morphed = morphWord(bare);
+        if (keepCaps) morphed = normalizeCaps(bare, morphed);
+        out.push(morphed + punct);
+      }
+
+      // Question marker
+      if (hasQ){
+        // ensure space before appending ka
+        const last = out[out.length-1] || '';
+        const needsSpace = /[\w)]$/.test(last);
+        if (needsSpace) out.push(' ');
+        out.push('ka');
+      }
+
+      let res = out.join('');
+      if (!keepPunctSpace) res = res.replace(/\s+/g,' ').trim();
+      return res;
+    }
+
+    function demo(text){
+      document.getElementById('src').value = text;
+      translate();
+    }
+
+    function copyOut(){
+      const text = document.getElementById('out').textContent;
+      navigator.clipboard.writeText(text).then(()=>{
+        const btns = document.getElementsByClassName('btn');
+        if(btns[1]){ const b = btns[1]; const old=b.textContent; b.textContent='Copied!'; setTimeout(()=>b.textContent=old,1000); }
+      });
+    }
+
+    // Background: choose sizing based on screen vs image aspect ratio
+    (function(){
+      const el = document.getElementById('bg');
+      const IMG_SRC = 'alien-bg.jpg'; // ← Put this image next to index.html in your repo
+      const img = new Image();
+      img.onload = function(){
+        const imgAR = img.naturalWidth / img.naturalHeight;
+        function fit(){
+          const winAR = window.innerWidth / window.innerHeight;
+          // If window is wider than the image, stretch width; else stretch height.
+          el.style.backgroundImage = `url('${IMG_SRC}')`;
+          el.style.backgroundSize = (winAR > imgAR) ? '100% auto' : 'auto 100%';
+          // Always cover any remaining gap just in case
+          el.style.backgroundRepeat = 'no-repeat';
+          el.style.backgroundPosition = 'center';
+          // Fallback for very tall mobile browser UI
+          document.documentElement.style.setProperty('--vh', `${window.innerHeight * 0.01}px`);
+        }
+        fit();
+        window.addEventListener('resize', fit);
+      };
+      img.src = IMG_SRC;
+    })();
+
+    // Initial run
+    translate();
+  </script>
+</body>
+</html>
